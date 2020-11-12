@@ -15,7 +15,9 @@ class Player {
         while (true) {
             //--TODO: make more efficient?
             List<PotionRecipe> potionRecipes = new ArrayList<PotionRecipe>();
+            List<PotionRecipe> brewablePotionRecipes = new ArrayList<PotionRecipe>();
             Inventory inventory = new Inventory(0, 0, 0, 0, 0);
+            List<Spell> spellList = new ArrayList<Spell>();
 
             int actionCount = in.nextInt(); // the number of spells and recipes in play
             for (int i = 0; i < actionCount; i++) {
@@ -31,10 +33,27 @@ class Player {
                 boolean castable = in.nextInt() != 0; // in the first league: always 0; later: 1 if this is a castable player spell
                 boolean repeatable = in.nextInt() != 0; // for the first two leagues: always 0; later: 1 if this is a repeatable player spell
 
-                //--Update potion recipe list
-                PotionRecipe potionRecipe = new PotionRecipe(actionId, delta0, delta1, delta2, delta3, price);
-                potionRecipes.add(potionRecipe);
-                System.err.println("Added following recipe to list: " + actionId + "," + delta0 + "," + delta1 + "," + delta2 + "," + delta3 + "," + price);
+                switch (actionType) {
+                    case "BREW":
+                        //--Update potion recipe list
+                        PotionRecipe potionRecipe = new PotionRecipe(actionId, delta0, delta1, delta2, delta3, price);
+                        potionRecipes.add(potionRecipe);
+                        //System.err.println("Added following recipe to list: " + actionId + "," + delta0 + "," + delta1 + "," + delta2 + "," + delta3 + "," + price);
+                        break;
+                    case "CAST":
+                        Spell spell = new Spell(actionId,delta0,delta1,delta2,delta3,tomeIndex,taxCount,castable,repeatable);
+                        spellList.add(spell);
+                        System.err.println("Added following spell to list: " + actionId + "," + delta0 + "," + delta1 + "," + delta2 + "," + delta3 + "," + tomeIndex + "," + taxCount + "," + castable + "," + repeatable);
+                        break;
+                    case "OPPONENT_CAST":
+                        System.err.println("OPPONENT_CAST??");
+                        break;
+                    case "LEARN":
+                        System.err.println("LEARN??");
+                        break;
+                    default:
+                        System.err.println("Your switch case if broken");
+                }
 
             }
             for (int i = 0; i < 2; i++) {
@@ -47,11 +66,11 @@ class Player {
                 //--Update inventory
                 inventory = new Inventory(inv0, inv1, inv2, inv3, score);
                 //--TODO change this to local variables after trust is gained
-                System.err.println("inventory:" + inventory.getInv0() + "," + inventory.getInv1() + "," + inventory.getInv2() + "," + inventory.getInv3());
+                //System.err.println("inventory:" + inventory.getInv0() + "," + inventory.getInv1() + "," + inventory.getInv2() + "," + inventory.getInv3());
             }
 
             //--1. Check all potions if can brew
-            List<PotionRecipe> brewablePotionRecipes = new ArrayList<PotionRecipe>();
+
             for (PotionRecipe pr : potionRecipes) {
                 if (canBrew(pr, inventory)) {
                     brewablePotionRecipes.add(pr);
@@ -59,39 +78,101 @@ class Player {
 
             }
 
-            //--2. choose best one, maybe by price... actually sort by price
+            //--TODO: make spell types for each reagent
+            for (Spell spell : spellList) {
+                if(spell.getDelta0() > 0){
+                    spell.setspellType(0);
+                }else if (spell.getDelta1() > 0){
+                    spell.setspellType(1);
+                }else if (spell.getDelta2() > 0){
+                    spell.setspellType(2);
+                }else if (spell.getDelta3() > 0){
+                    spell.setspellType(3);
+                }else{
+                    System.err.println("Your spell if else is broken");
+                }
+            }
 
-            brewablePotionRecipes.sort((a, b) -> b.getPrice().compareTo(a.getPrice()));
-            System.err.println("can not Brew, not enough D2");
+            //--2. If there is no brewable potions, try to cast incredients
+            if(brewablePotionRecipes.isEmpty()){
+                if(inventory.getInv0() == 0){
+                    for(Spell s :spellList){
+                        if(s.getspellType() == 0){
+                            cast(s);
+                        }
+                    }
+                }
+                if(inventory.getInv1() == 0
+                        && inventory.getInv2() == 0
+                        && inventory.getInv3() == 0){
+                    for(Spell s :spellList){
+                        if(s.getspellType() == 1){
+                            cast(s);
+                        }
+                    }
+                }
+                if(inventory.getInv2() == 0
+                        && inventory.getInv3() == 0){
+                    for(Spell s :spellList){
+                        if(s.getspellType() == 2){
+                            cast(s);
+                        }
+                    }
+                }
+                if(inventory.getInv3() == 0){
+                    for(Spell s :spellList){
+                        if(s.getspellType() == 3){
+                            cast(s);
+                        }
+                    }
+                }
+            }else{
+                brewablePotionRecipes.sort((a, b) -> b.getPrice().compareTo(a.getPrice()));
+                brew(brewablePotionRecipes.get(0));
+            }
 
-            //--3. Brew
-            brew(brewablePotionRecipes.get(0));
+
+
+
+            //--3. Choose action
+
+
+
+
 
         }
+    }
+
+    public static void cast(Spell spell) {
+        System.out.println("CAST " + spell.spellId);
     }
 
     public static void brew(PotionRecipe potionRecipe) {
         System.out.println("BREW " + potionRecipe.potionId);
     }
 
+    public static void rest() {
+        System.out.println("REST");
+    }
+
 
     public static boolean canBrew(PotionRecipe pr, Inventory inventory) {
-        System.err.println("check if can Brew:" + pr.potionId);
+        //System.err.println("check if can Brew:" + pr.potionId);
 
         if (pr.getDelta0() + inventory.getInv0() < 0) {
-            System.err.println("can not Brew, not enough D0");
+            //System.err.println("can not Brew, not enough D0");
             return false;
         } else if (pr.getDelta1() + inventory.getInv1() < 0) {
-            System.err.println("can not Brew, not enough D1");
+            //System.err.println("can not Brew, not enough D1");
             return false;
         } else if (pr.getDelta2() + inventory.getInv2() < 0) {
-            System.err.println("can not Brew, not enough D2");
+            //System.err.println("can not Brew, not enough D2");
             return false;
         } else if (pr.getDelta3() + inventory.getInv3() < 0) {
-            System.err.println("can not Brew, not enough D3");
+            //System.err.println("can not Brew, not enough D3");
             return false;
         } else {
-            System.err.println("canBrew");
+            //System.err.println("canBrew");
             return true;
         }
     }
@@ -99,6 +180,75 @@ class Player {
 
 }
 
+class Spell {
+    int spellId;
+    int delta0;
+    int delta1;
+    int delta2;
+    int delta3;
+    int tomeIndex; // in the first two leagues: always 0; later: the index in the tome if this is a tome spell, equal to the read-ahead tax
+    int taxCount; // in the first two leagues: always 0; later: the amount of taxed tier-0 ingredients you gain from learning this spell
+    boolean castable; // in the first league: always 0; later: 1 if this is a castable player spell
+    boolean repeatable; // for the first two leagues: always 0; later: 1 if this is a repeatable player spell
+    int spellType; //TODO make better for now 1 2 3
+
+    public Spell(int spellId, int delta0, int delta1, int delta2, int delta3, int tomeIndex, int taxCount, boolean castable, boolean repeatable) {
+        this.spellId = spellId;
+        this.delta0 = delta0;
+        this.delta1 = delta1;
+        this.delta2 = delta2;
+        this.delta3 = delta3;
+        this.tomeIndex = tomeIndex;
+        this.taxCount = taxCount;
+        this.castable = castable;
+        this.repeatable = repeatable;
+    }
+
+    public int getspellType() {
+        return spellType;
+    }
+    //TODO make better
+    public void setspellType(int spellType) {
+        this.spellType = spellType;
+    }
+
+
+    public int getSpellId() {
+        return spellId;
+    }
+
+    public int getDelta0() {
+        return delta0;
+    }
+
+    public int getDelta1() {
+        return delta1;
+    }
+
+    public int getDelta2() {
+        return delta2;
+    }
+
+    public int getDelta3() {
+        return delta3;
+    }
+
+    public int getTomeIndex() {
+        return tomeIndex;
+    }
+
+    public int getTaxCount() {
+        return taxCount;
+    }
+
+    public boolean isCastable() {
+        return castable;
+    }
+
+    public boolean isRepeatable() {
+        return repeatable;
+    }
+}
 
 class PotionRecipe {
     int potionId;
@@ -150,6 +300,7 @@ class Inventory {
     int inv2;
     int inv3;
     int score; // amount of rupees
+    //--TODO: maybe a full boolean ? 10/10
 
     public Inventory(int inv0, int inv1, int inv2, int inv3, int score) {
         this.inv0 = inv0;

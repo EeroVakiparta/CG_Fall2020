@@ -36,6 +36,17 @@ Record:
 No record
 ```
 
+### Brewitch 2000
+[evak_Java.java](evak_Java.java)
+
+Cooks the most profitable potion.
+
+Record:
+
+```
+Bronze 363th
+```
+
 ## Csharp
 
 ### Csharp template
@@ -62,6 +73,8 @@ No record
 
 ### Javascript template
 [CC_JavaScript.js](CC_JavaScript.js)
+
+Tries randomly cook recipes.
 
 Record:
 

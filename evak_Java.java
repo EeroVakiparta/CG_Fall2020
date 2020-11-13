@@ -13,6 +13,8 @@ class Player {
 
         boolean brewed = true;
         PotionRecipe bestProfitRecipe = new PotionRecipe();
+        Spell bestLearnableSpell = new Spell();
+        int learnedSpell = 0;
 
         // game loop
         while (true) {
@@ -21,6 +23,7 @@ class Player {
             List<PotionRecipe> brewablePotionRecipes = new ArrayList<PotionRecipe>();
             Inventory inventory = new Inventory(0, 0, 0, 0, 0);
             List<Spell> spellList = new ArrayList<Spell>();
+            List<Spell> spellBook = new ArrayList<Spell>();
 
 
             int actionCount = in.nextInt(); // the number of spells and recipes in play
@@ -53,7 +56,9 @@ class Player {
                         //System.err.println("OPPONENT_CAST??");
                         break;
                     case "LEARN":
-                        System.err.println("LEARN??");
+                        Spell learnableSpell = new Spell(actionId,delta0,delta1,delta2,delta3,tomeIndex,taxCount,castable,repeatable);
+                        spellBook.add(learnableSpell);
+                        System.err.println("Added learnable spell to list: " + actionId + "," + delta0 + "," + delta1 + "," + delta2 + "," + delta3 + "," + tomeIndex + "," + taxCount + "," + castable + "," + repeatable);
                         break;
                     default:
                         System.err.println("Your switch case if broken");
@@ -75,6 +80,21 @@ class Player {
                 //--TODO change this to local variables after trust is gained
                 //System.err.println("inventory:" + inventory.getInv0() + "," + inventory.getInv1() + "," + inventory.getInv2() + "," + inventory.getInv3());
             }
+
+            double tmpSpellValue = 0.0;
+            //-- Check for worthy spells in tome
+            if(learnedSpell < 5){
+
+                for(Spell s : spellBook){
+                    double spellValue = giveSpellValue(s);
+                    if (tmpSpellValue < spellValue){
+                        tmpSpellValue = spellValue;
+                        bestLearnableSpell = s;
+                    }
+                }
+            }
+
+
 
             //--1. Check the best profit for potion
             potionRecipes.sort((a, b) -> b.getProfit().compareTo(a.getProfit()));
@@ -119,7 +139,15 @@ class Player {
             }
 
             // Try to reach the requirements of recipe
-            if(Math.abs(bestProfitRecipe.getDelta3()) > inventory.getInv3() && inventory.getInv2() > 0){
+            if(learnedSpell < 5 && tmpSpellValue > 0.0){
+                System.err.println("---" + bestLearnableSpell.getTaxCount() + " " + inventory.getInv0());
+                if(bestLearnableSpell.getTomeIndex() > inventory.getInv0()){
+                    cast(spell0);
+                }else{
+                    learn(bestLearnableSpell);
+                    learnedSpell = learnedSpell + 1;
+                }
+            }else if(Math.abs(bestProfitRecipe.getDelta3()) > inventory.getInv3() && inventory.getInv2() > 0){
                 System.err.println(inventory.getInv3() + " " + inventory.getInv2());
                 cast(spell3);
             }else if((Math.abs(bestProfitRecipe.getDelta2()) > inventory.getInv2()
@@ -204,11 +232,13 @@ class Player {
 
         // First version greedily find out if spell is positive only
         if(delta0 >= 0
-        && delta1 >= 0
-        && delta2 >= 0
-        && delta3 >= 0){
+                && delta1 >= 0
+                && delta2 >= 0
+                && delta3 >= 0){
             return 9999.0;
         }
+
+        return spellValue;
     }
 
     public static void cast(Spell spell) {
@@ -219,6 +249,10 @@ class Player {
             rest();
         }
 
+    }
+
+    public static void learn(Spell spell) {
+        System.out.println("LEARN " + spell.spellId);
     }
 
     public static void brew(PotionRecipe potionRecipe) {
@@ -264,7 +298,7 @@ class Spell {
     int taxCount; // in the first two leagues: always 0; later: the amount of taxed tier-0 ingredients you gain from learning this spell
     boolean castable; // in the first league: always 0; later: 1 if this is a castable player spell
     boolean repeatable; // for the first two leagues: always 0; later: 1 if this is a repeatable player spell
-    int spellType; //TODO make better for now 1 2 3
+    int spellType; //TODO make better for now 1 2 3 !!!
 
     public Spell(){
 

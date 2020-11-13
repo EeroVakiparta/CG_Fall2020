@@ -61,7 +61,7 @@ No record
 ## Javascript
 
 ### Javascript template
-[CC_Javascript.js](CC_Javascript.js)
+[CC_JavaScript.js](CC_JavaScript.js)
 
 Record:
 

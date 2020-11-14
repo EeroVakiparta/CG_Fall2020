@@ -16,6 +16,8 @@ class Player {
 
         boolean brewed = true;
         PotionRecipe bestProfitRecipe = new PotionRecipe();
+        // Base cost of a reagent in turns. Not sure about how to do delta 1 maybe it is 1.5 ?
+        CostChart costChart = new CostChart(0.5,2,3,4); //Is it ok to have it here?
 
         // game loop
         while (true) {
@@ -24,6 +26,7 @@ class Player {
             List<PotionRecipe> brewablePotionRecipes = new ArrayList<PotionRecipe>();
             Inventory inventory = new Inventory(0, 0, 0, 0, 0);
             List<Spell> spellList = new ArrayList<Spell>();
+
 
 
             int actionCount = in.nextInt(); // the number of spells and recipes in play
@@ -403,22 +406,22 @@ class PotionRecipe {
         this.profit = 1.0 * price / ingredientCost;
     }
 
-    public Double getProfit(costChart){ // not in my right mind... is this stupid ?
-        Double cost = Math.abs(delta0) * costChart.getDelta0PriceInTurns()
-                + Math.abs(delta1) * costChart.getDelta1PriceInTurns()
-                + Math.abs(delta2) * costChart.getDelta2PriceInTurns()
-                + Math.abs(delta3) * costChart.getDelta3PriceInTurns();
-        this.profit = this.price / cost;
-        return profit;
+    public Double getIngredientCost() {
+        return ingredientCost;
     }
 
-    public Double getIngredientCost(costChart){ // not in my right mind... is this stupid ?
-        Double cost = Math.abs(delta0) * costChart.getDelta0PriceInTurns()
+    public void updateIngredientCostAndProfit(CostChart costChart) {
+        this.ingredientCost = Math.abs(delta0) * costChart.getDelta0PriceInTurns() // not in my right mind... is this stupid ?
                 + Math.abs(delta1) * costChart.getDelta1PriceInTurns()
                 + Math.abs(delta2) * costChart.getDelta2PriceInTurns()
                 + Math.abs(delta3) * costChart.getDelta3PriceInTurns();
-        this.ingredientCost = cost;
-        return ingredientCost;
+        this.profit = 1.0 * this.price / this.ingredientCost;
+    }
+
+    public Double getProfit() {
+        //TODO: is this a dangerous ? Can the data be outdated?
+        //I do not want to recalculate after every call. Just have to be careful.
+        return profit;
     }
 
     public int getPotionId() {

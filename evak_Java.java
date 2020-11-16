@@ -6,6 +6,9 @@ import java.util.Collection;
 import java.util.List;
 import java.util.ArrayList;
 
+
+
+
 class Player {
 
     public static void main(String args[]) {
@@ -15,6 +18,8 @@ class Player {
         PotionRecipe bestProfitRecipe = new PotionRecipe();
         Spell bestLearnableSpell = new Spell();
         int learnedSpell = 0;
+        // Base cost of a reagent in turns. Not sure about how to do delta 1 maybe it is 1.5 ?
+        CostChart costChart = new CostChart(0.5,2,3,4); //Is it ok to have it here?
 
         // game loop
         while (true) {
@@ -24,6 +29,7 @@ class Player {
             Inventory inventory = new Inventory(0, 0, 0, 0, 0);
             List<Spell> spellList = new ArrayList<Spell>();
             List<Spell> spellBook = new ArrayList<Spell>();
+
 
 
             int actionCount = in.nextInt(); // the number of spells and recipes in play
@@ -362,6 +368,52 @@ class Spell {
     }
 }
 
+class CostChart{
+    double delta0PriceInTurns = 0.5;
+    double delta1PriceInTurns = 2; // should this be calculated by average ?
+    double delta2PriceInTurns = 3;
+    double delta3PriceInTurns = 4;
+
+    public CostChart(double delta0PriceInTurns, double delta1PriceInTurns, double delta2PriceInTurns, double delta3PriceInTurns) {
+        this.delta0PriceInTurns = delta0PriceInTurns;
+        this.delta1PriceInTurns = delta1PriceInTurns;
+        this.delta2PriceInTurns = delta2PriceInTurns;
+        this.delta3PriceInTurns = delta3PriceInTurns;
+    }
+
+    public double getDelta0PriceInTurns() {
+        return delta0PriceInTurns;
+    }
+
+    public void setDelta0PriceInTurns(double delta0PriceInTurns) {
+        this.delta0PriceInTurns = delta0PriceInTurns;
+    }
+
+    public double getDelta1PriceInTurns() {
+        return delta1PriceInTurns;
+    }
+
+    public void setDelta1PriceInTurns(double delta1PriceInTurns) {
+        this.delta1PriceInTurns = delta1PriceInTurns;
+    }
+
+    public double getDelta2PriceInTurns() {
+        return delta2PriceInTurns;
+    }
+
+    public void setDelta2PriceInTurns(double delta2PriceInTurns) {
+        this.delta2PriceInTurns = delta2PriceInTurns;
+    }
+
+    public double getDelta3PriceInTurns() {
+        return delta3PriceInTurns;
+    }
+
+    public void setDelta3PriceInTurns(double delta3PriceInTurns) {
+        this.delta3PriceInTurns = delta3PriceInTurns;
+    }
+}
+
 class PotionRecipe {
     int potionId;
     int delta0; // tier-0 ingredient change
@@ -369,28 +421,41 @@ class PotionRecipe {
     int delta2; // tier-2 ingredient change
     int delta3; // tier-3 ingredient change
     Integer price;
-    int ingredientCost;
+    Double ingredientCost;
     Double profit;
 
     public PotionRecipe(){};
 
-    public PotionRecipe(int potionId, int delta0, int delta1, int delta2, int delta3, Integer price) {
+    public PotionRecipe(int potionId, int delta0, int delta1, int delta2, int delta3, Integer price, CostChart costChart) {
         this.potionId = potionId;
         this.delta0 = delta0;
         this.delta1 = delta1;
         this.delta2 = delta2;
         this.delta3 = delta3;
         this.price = price;
-        this.ingredientCost = Math.abs(delta0) + Math.abs(delta1) * 2 + Math.abs(delta2) * 3 + Math.abs(delta3) * 4;
+        this.ingredientCost = Math.abs(delta0) * costChart.getDelta0PriceInTurns() // not in my right mind... is this stupid ?
+                + Math.abs(delta1) * costChart.getDelta1PriceInTurns()
+                + Math.abs(delta2) * costChart.getDelta2PriceInTurns()
+                + Math.abs(delta3) * costChart.getDelta3PriceInTurns();
         this.profit = 1.0 * price / ingredientCost;
     }
 
-    public Double getProfit(){
-        return profit;
+    public Double getIngredientCost() {
+        return ingredientCost;
     }
 
-    public int getIngredientCost(){
-        return ingredientCost;
+    public void updateIngredientCostAndProfit(CostChart costChart) {
+        this.ingredientCost = Math.abs(delta0) * costChart.getDelta0PriceInTurns() // not in my right mind... is this stupid ?
+                + Math.abs(delta1) * costChart.getDelta1PriceInTurns()
+                + Math.abs(delta2) * costChart.getDelta2PriceInTurns()
+                + Math.abs(delta3) * costChart.getDelta3PriceInTurns();
+        this.profit = 1.0 * this.price / this.ingredientCost;
+    }
+
+    public Double getProfit() {
+        //TODO: is this a dangerous ? Can the data be outdated?
+        //I do not want to recalculate after every call. Just have to be careful.
+        return profit;
     }
 
     public int getPotionId() {

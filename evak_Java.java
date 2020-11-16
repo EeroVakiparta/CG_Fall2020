@@ -49,7 +49,8 @@ class Player {
                 switch (actionType) {
                     case "BREW":
                         //--Update potion recipe list
-                        PotionRecipe potionRecipe = new PotionRecipe(actionId, delta0, delta1, delta2, delta3, price);
+                        PotionRecipe potionRecipe = new PotionRecipe(actionId, delta0, delta1, delta2, delta3, price, costChart);
+                        potionRecipe.updateIngredientCostAndProfit(costChart); // get the new values which are changed when new spells were learned, remember this need to be update before getProfit
                         potionRecipes.add(potionRecipe);
                         //System.err.println("Added following recipe to list: " + actionId + "," + delta0 + "," + delta1 + "," + delta2 + "," + delta3 + "," + price);
                         break;
@@ -126,6 +127,7 @@ class Player {
             Spell spell3 = new Spell();
 
             //--TODO: set spell types for each reagent
+            // might need to do all combinations of spell types ?? try to see if any other way
             for (Spell spell : spellList) {
                 if(spell.getDelta0() > 0){
                     spell.setspellType(0);
@@ -151,6 +153,7 @@ class Player {
                     cast(spell0);
                 }else{
                     learn(bestLearnableSpell);
+                    costChart = costCharUpdater(bestLearnableSpell,costChart);
                     learnedSpell = learnedSpell + 1;
                 }
             }else if(Math.abs(bestProfitRecipe.getDelta3()) > inventory.getInv3() && inventory.getInv2() > 0){
@@ -176,59 +179,27 @@ class Player {
                 cast(spell0);
             }
 
-            /*
-            if(brewablePotionRecipes.isEmpty()){
-                if(inventory.getInv0() == 0){
-                    for(Spell s :spellList){
-                        if(s.getspellType() == 0){
-                            cast(s);
-                        }
-                    }
-                }
-                if(inventory.getInv1() == 0
-                && inventory.getInv2() == 0
-                && inventory.getInv3() == 0){
-                    for(Spell s :spellList){
-                        if(s.getspellType() == 1){
-                            cast(s);
-                        }
-                    }
-                }
-                if(inventory.getInv2() == 0
-                && inventory.getInv3() == 0){
-                    for(Spell s :spellList){
-                        if(s.getspellType() == 2){
-                            cast(s);
-                        }
-                    }
-                }
-                if(inventory.getInv3() == 0){
-                    for(Spell s :spellList){
-                        if(s.getspellType() == 3){
-                            cast(s);
-                        }
-                    }
-                }
-            }else{
-                brewablePotionRecipes.sort((a, b) -> b.getPrice().compareTo(a.getPrice()));
-                brew(brewablePotionRecipes.get(0));
-            }
-
-            */
-
-
-            //--3. Choose action
-
-
-
-
-
         }
+    }
+
+    public static CostChart costCharUpdater(Spell newLearnedSpell, CostChart costChart){
+        int delta0 = newLearnedSpell.getDelta0();
+        int delta1 = newLearnedSpell.getDelta1();
+        int delta2 = newLearnedSpell.getDelta2();
+        int delta3 = newLearnedSpell.getDelta3();
+
+        costChart.setDelta0PriceInTurns(costChart.getDelta0PriceInTurns() / Math.abs(delta0));
+        costChart.setDelta0PriceInTurns(costChart.getDelta1PriceInTurns() / Math.abs(delta1));
+        costChart.setDelta0PriceInTurns(costChart.getDelta2PriceInTurns() / Math.abs(delta2));
+        costChart.setDelta0PriceInTurns(costChart.getDelta3PriceInTurns() / Math.abs(delta3));
+
+        return costChart;
     }
 
     public static double giveSpellValue(Spell spell){
         //System.err.println("giveSpellValue:" + spell.getSpellId() + " spellid");
 
+        // !!!! Does ingredient cost chart need to be taken into account?
         int delta0 = spell.getDelta0();
         int delta1 = spell.getDelta1();
         int delta2 = spell.getDelta2();
@@ -369,10 +340,10 @@ class Spell {
 }
 
 class CostChart{
-    double delta0PriceInTurns = 0.5;
-    double delta1PriceInTurns = 2; // should this be calculated by average ?
-    double delta2PriceInTurns = 3;
-    double delta3PriceInTurns = 4;
+    double delta0PriceInTurns;
+    double delta1PriceInTurns;
+    double delta2PriceInTurns;
+    double delta3PriceInTurns;
 
     public CostChart(double delta0PriceInTurns, double delta1PriceInTurns, double delta2PriceInTurns, double delta3PriceInTurns) {
         this.delta0PriceInTurns = delta0PriceInTurns;

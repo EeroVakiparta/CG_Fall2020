@@ -2,6 +2,7 @@ import java.awt.*;
 import java.util.*;
 import java.io.*;
 import java.math.*;
+import java.net.CacheRequest;
 import java.util.Collection;
 import java.util.List;
 import java.util.ArrayList;
@@ -14,14 +15,18 @@ class Player {
         boolean brewed = true;
         boolean enemyStoleMyRecipe = false;
         boolean costChartChanged = false;
+        boolean bestRouteFound = false;
         PotionRecipe bestProfitRecipe = new PotionRecipe();
         PotionRecipe bestBrewableRecipe = new PotionRecipe();
         Spell bestLearnableSpell = new Spell();
         int learnedSpell = 0;
         // Base cost of a reagent in turns. Not sure about how to do delta 1 maybe it is 1.5 ?
-        CostChart costChart = new CostChart(1,3,4,5); //Is it ok to have it here?
+        CostChart costChart = new CostChart(1, 3, 4, 5); //Is it ok to have it here?
         int turn = 0;
         int brewedPotions = 0;
+        int routeCounter = 0;
+
+        List<Integer> bestSpellRoute = new ArrayList<Integer>();
 
 
         // game loop
@@ -56,11 +61,11 @@ class Player {
                         PotionRecipe potionRecipe = new PotionRecipe(actionId, delta0, delta1, delta2, delta3, price, costChart);
                         potionRecipe.updateIngredientCostAndProfit(costChart); // get the new values which are changed when new spells were learned, remember this need to be update before getProfit
                         potionRecipes.add(potionRecipe);
-                        recipeInv = addToRecipeInventory(potionRecipe,recipeInv);
+                        recipeInv = addToRecipeInventory(potionRecipe, recipeInv);
                         //System.err.println("Added following recipe to list: " + actionId + "," + delta0 + "," + delta1 + "," + delta2 + "," + delta3 + "," + price);
                         break;
                     case "CAST":
-                        Spell spell = new Spell(actionId,delta0,delta1,delta2,delta3,tomeIndex,taxCount,castable,repeatable);
+                        Spell spell = new Spell(actionId, delta0, delta1, delta2, delta3, tomeIndex, taxCount, castable, repeatable);
                         spellList.add(spell);
                         //System.err.println("Added following spell to list: " + actionId + "," + delta0 + "," + delta1 + "," + delta2 + "," + delta3 + "," + tomeIndex + "," + taxCount + "," + castable + "," + repeatable);
                         break;
@@ -68,7 +73,7 @@ class Player {
                         //System.err.println("OPPONENT_CAST??");
                         break;
                     case "LEARN":
-                        Spell learnableSpell = new Spell(actionId,delta0,delta1,delta2,delta3,tomeIndex,taxCount,castable,repeatable);
+                        Spell learnableSpell = new Spell(actionId, delta0, delta1, delta2, delta3, tomeIndex, taxCount, castable, repeatable);
                         spellBook.add(learnableSpell);
                         //System.err.println("Added learnable spell to list: " + actionId + "," + delta0 + "," + delta1 + "," + delta2 + "," + delta3 + "," + tomeIndex + "," + taxCount + "," + castable + "," + repeatable);
                         break;
@@ -85,11 +90,11 @@ class Player {
                 int score = in.nextInt(); // amount of rupees
 
                 //--Update inventory
-                if(i == 0){
+                if (i == 0) {
                     inventory = new Inventory(inv0, inv1, inv2, inv3, score);
-                    System.err.print("inv:[" + inv0 + "," + inv1 + "," + inv2 + "," + inv3 + "," + score +"]");
-                }else if ( i == 1){
-                    enemyInv =  new Inventory(inv0, inv1, inv2, inv3, score);
+                    System.err.print("inv:[" + inv0 + "," + inv1 + "," + inv2 + "," + inv3 + "," + score + "]");
+                } else if (i == 1) {
+                    enemyInv = new Inventory(inv0, inv1, inv2, inv3, score);
                     System.err.print(" EInv:[" + inv0 + "," + inv1 + "," + inv2 + "," + inv3 + "," + score + "]\n");
                 }
             }
@@ -97,12 +102,12 @@ class Player {
 
             double tmpSpellValue = 0.0;
             //-- Check for worthy spells in tome
-            if(learnedSpell < 5){
+            if (learnedSpell < 0) {  // ----------------------------------------------------------- CAN ADJUST
                 // TODO give spell value should have old already known spells
-                for(Spell s : spellBook){
-                    double spellValue = giveSpellValue(s,costChart,recipeInv);
+                for (Spell s : spellBook) {
+                    double spellValue = giveSpellValue(s, costChart, recipeInv);
                     System.err.println("id: " + s.getSpellId() + " value: " + spellValue);
-                    if (tmpSpellValue < spellValue){
+                    if (tmpSpellValue < spellValue) {
                         tmpSpellValue = spellValue;
                         bestLearnableSpell = s;
                     }
@@ -112,19 +117,21 @@ class Player {
 
             //TODO refactor so stupid, first think recipe was stolen, if it is found unstolen
             enemyStoleMyRecipe = true;
-            for(PotionRecipe pr : potionRecipes){
-                if(bestProfitRecipe.getPotionId() == pr.getPotionId()){
+            for (PotionRecipe pr : potionRecipes) {
+                if (bestProfitRecipe.getPotionId() == pr.getPotionId()) {
                     enemyStoleMyRecipe = false;
                 }
             }
-            if(enemyStoleMyRecipe){
+            if (enemyStoleMyRecipe) {
                 System.err.println("THIEF!!");
+                bestRouteFound = false;
+                routeCounter = 0;
             }
 
 
             //--1. Check the best profit for potion
             potionRecipes.sort((a, b) -> b.getProfit().compareTo(a.getProfit()));
-            if(brewed || enemyStoleMyRecipe || costChartChanged){
+            if (brewed || enemyStoleMyRecipe || costChartChanged) {
                 bestProfitRecipe = potionRecipes.get(0);
                 brewed = false;
             }
@@ -141,6 +148,8 @@ class Player {
             */
 
             //xx---- TODO: maybe dont do this ever time to save calculation pover
+
+            /*
             for (PotionRecipe pr : potionRecipes) {
                 if (canBrew(pr, inventory)) {
                     brewablePotionRecipes.add(pr);
@@ -160,6 +169,8 @@ class Player {
                 System.err.println("Best brewable: " + bestBrewableRecipe);
             }
 
+
+
             //xx----
 
             // Rush if you are winning and one more potion to be made.
@@ -168,121 +179,154 @@ class Player {
                 brew(brewablePotionRecipes.get(0));
             }
 
-
+            */
 
             //This is temporary
             List<Spell> spell0s = new ArrayList<Spell>();
-            List<Spell> spell1s = new ArrayList<Spell>();
-            List<Spell> spell2s = new ArrayList<Spell>();
-            List<Spell> spell3s = new ArrayList<Spell>();
-
 
             // might need to do all combinations of spell types ?? try to see if any other way
             //--TODO: set spell types for each reagent
             for (Spell spell : spellList) {
-                if(spell.getDelta3() > 0){
-                    spell.setspellType(3);
-                    spell3s.add(spell);
-                }else if (spell.getDelta2() > 0){
-                    spell.setspellType(2);
-                    spell2s.add(spell);
-                }else if (spell.getDelta1() > 0){
-                    spell.setspellType(1);
-                    spell1s.add(spell);
-                }else if (spell.getDelta0() > 0){
+                if (spell.getDelta0() > 0) {
                     spell.setspellType(0);
                     spell0s.add(spell);
-                }else{
-                    System.err.println("Your spell if else is broken");
                 }
             }
 
             // Try to reach the requirements of recipe
             // first try to learn a spells
-            if(learnedSpell < 3 && tmpSpellValue > 0.0 && turn < 25){
+            if (learnedSpell < 0 && tmpSpellValue > 0.0 && turn < 25) {   // ----------------------------------------------------------- CAN ADJUST
                 System.err.println("---" + bestLearnableSpell.getTaxCount() + " " + inventory.getInv0());
-                if(bestLearnableSpell.getTomeIndex() > inventory.getInv0()){
+                if (bestLearnableSpell.getTomeIndex() > inventory.getInv0()) {
                     //TODO check this
                     spell0s.sort((a, b) -> b.getDelta0().compareTo(a.getDelta0()));
                     cast(spell0s.get(0));
-                }else{
+                } else {
 
-                    costChart = costCharUpdater(bestLearnableSpell,costChart);
+                    costChart = costCharUpdater(bestLearnableSpell, costChart);
                     System.err.println("new costChart:" + costChart.toString());
                     System.err.println("Learned spell value:" + tmpSpellValue);
                     costChartChanged = true;
                     learn(bestLearnableSpell);
                     learnedSpell = learnedSpell + 1;
                 }
-                // If good recipes are bought already check if there is enough the delta 3
-                // If not will pick the best spell to get that delta 3
-            }else if(Math.abs(bestProfitRecipe.getDelta3()) > inventory.getInv3()
-                    && inventory.getInv2() > 0){
-                System.err.println(inventory.getInv3() + " " + inventory.getInv2());
-                Spell bestSpellPicketForProfitRecipe3s = new Spell();
-                bestSpellPicketForProfitRecipe3s = spellPickerForRecipe(spell3s, inventory, bestProfitRecipe);
+            } else {
 
-                if(bestSpellPicketForProfitRecipe3s != null){
-                    System.err.println(bestSpellPicketForProfitRecipe3s.getSpellId() + " on paras");
-                    cast(bestSpellPicketForProfitRecipe3s);
-                }else{
-                    rest();
-                }
 
-            }else if((Math.abs(bestProfitRecipe.getDelta2()) > inventory.getInv2()
-                    || Math.abs(bestProfitRecipe.getDelta3()) > inventory.getInv3())
-                    && inventory.getInv1() > 0){
-                System.err.println(inventory.getInv2() + " " + inventory.getInv1());
-                Spell bestSpellPicketForProfitRecipe2s = new Spell();
-                bestSpellPicketForProfitRecipe2s = spellPickerForRecipe(spell2s, inventory, bestProfitRecipe);
+                if (bestRouteFound) {
 
-                if(bestSpellPicketForProfitRecipe2s != null){
-                    System.err.println(bestSpellPicketForProfitRecipe2s.getSpellId() + " on paras");
-                    cast(bestSpellPicketForProfitRecipe2s);
-                }else{
-                    rest();
-                }
+                    int spellIDToCastThisTurn = bestSpellRoute.get(routeCounter);
 
-            }else if((Math.abs(bestProfitRecipe.getDelta1()) > inventory.getInv1()
-                    || Math.abs(bestProfitRecipe.getDelta2()) > inventory.getInv2()
-                    || Math.abs(bestProfitRecipe.getDelta3()) > inventory.getInv3())
-                    && inventory.getInv0() > 0){
-                System.err.println(inventory.getInv1() + " " + inventory.getInv0());
-                Spell bestSpellPicketForProfitRecipe1s = new Spell();
-                bestSpellPicketForProfitRecipe1s = spellPickerForRecipe(spell1s, inventory, bestProfitRecipe);
+                    if (canBrew(bestProfitRecipe, inventory)) {
+                        brew(bestProfitRecipe);
+                        // Remember to reset things
+                        // RouteCounter and besRouteFound after casting
+                        routeCounter = 0;
+                        bestRouteFound = false;
+                    } else {
+                        // 9000 is rest ID
+                        if (spellIDToCastThisTurn == 9000) {
+                            rest();
+                        } else {
+                            Spell spellToCastNow = spellBook.get(spellIDToCastThisTurn);
+                            cast(spellToCastNow);
+                            routeCounter++;
+                        }
+                    }
 
-                if(bestSpellPicketForProfitRecipe1s != null){
-                    System.err.println(bestSpellPicketForProfitRecipe1s.getSpellId() + " on paras");
-                    cast(bestSpellPicketForProfitRecipe1s);
-                }else{
-                    rest();
-                }
 
-            }else if(Math.abs(bestProfitRecipe.getDelta3()) <= inventory.getInv3()
-                    && Math.abs(bestProfitRecipe.getDelta2()) <= inventory.getInv2()
-                    && Math.abs(bestProfitRecipe.getDelta1()) <= inventory.getInv1()
-                    && Math.abs(bestProfitRecipe.getDelta0()) <= inventory.getInv0()) {
-                brewed = true;
-                brew(bestProfitRecipe);
-                brewedPotions++;
+                } else {
+                    bestSpellRoute = new ArrayList<Integer>();
+                    List<Integer> spellRoute = new ArrayList<Integer>();
+                    List<Spell> tempSpellBook = spellBook;
+                    Inventory tmpInventory = inventory;
+                    int tryCounter = 0;
+                    int worseOrSameInARow = 0;
+                    int maxTurnsToCookRecipe = 10;  // ----------------------------------------------------------- CAN ADJUST
+                    int howManyTriesAfterFindingSpellRouteToTryToFindEvenBetter = 10; // ----------------------------------------------------------- CAN ADJUST
+                    // Meillä on paras value resepti, ja pari spelliä
+                    while (!bestRouteFound) {
+                        boolean castableRandomSpellPicked = false;
+                        Spell randomPickedSpell = null;
 
-            }else {
-                Spell bestSpellPicketForProfitRecipe0s = new Spell();
-                bestSpellPicketForProfitRecipe0s = spellPickerForRecipe(spell0s, inventory, bestProfitRecipe);
+                        // Pikkaa yhen randomin spellin minkä voi castaa, jos ei mitään voi castaa niin rest.
+                        // !!!!!! Voi olla hyvä jos randomilla tulis rest , mutta edellinen yritys restas muutenki liikaa
+                        while (castableRandomSpellPicked) {
+                            boolean resting = false;
+                            Random random = new Random();
+                            // 50 Generates random integers 0 to 49
+                            int x = random.nextInt(tempSpellBook.size());
+                            randomPickedSpell = tempSpellBook.get(x);
 
-                if(bestSpellPicketForProfitRecipe0s != null){
-                    System.err.println(bestSpellPicketForProfitRecipe0s.getSpellId() + " on paras");
-                    cast(bestSpellPicketForProfitRecipe0s);
-                }else{
-                    rest();
+                            // Katso pystyykö randomilla valittua spelliä castimaan
+                            if (checkIfEnoughIncredientsToCast(randomPickedSpell, tmpInventory) && randomPickedSpell.isCastable() && checkIfRoom(randomPickedSpell, tmpInventory)) {
+                                spellRoute.add(randomPickedSpell.getSpellId());
+                                tempSpellBook.remove(x);
+                                castableRandomSpellPicked = true;
+
+                                // Jos ei pysty castimaan poista ja koita uudestaan.
+                            } else if (tempSpellBook.size() > 1) {
+                                tempSpellBook.remove(x);
+
+                                // Jos ei pysty mitään castimaan niin rest resti olkoon 9000
+                            } else {
+                                castableRandomSpellPicked = true;
+                                tempSpellBook = spellBook;
+                                spellRoute.add(9000);
+                            }
+                        }
+
+                        // Jos ei ollut rest pickattuna modaa inventoryä
+                        if (randomPickedSpell != null) {
+                            inventory = simulateSpellCast(randomPickedSpell, tmpInventory);
+                        }
+
+                        if (canBrew(bestBrewableRecipe, inventory)) {
+                            if (bestSpellRoute.size() > spellRoute.size()) {
+                                bestSpellRoute = spellRoute;
+                                System.err.println("Found A Route " + spellRoute.size());
+
+                            } else {
+                                worseOrSameInARow++;
+                                if (worseOrSameInARow > howManyTriesAfterFindingSpellRouteToTryToFindEvenBetter) {
+                                    bestRouteFound = true;
+                                }
+                            }
+                            //Reset and start again
+                            tempSpellBook = spellBook;
+                            tmpInventory = inventory;
+                        } else if (spellRoute.size() > maxTurnsToCookRecipe) {
+                            tempSpellBook = spellBook;
+                            tmpInventory = inventory;
+                            spellRoute = new ArrayList<Integer>();
+                        }
+
+                        tryCounter++;
+                        if (tryCounter % 2 == 0) {
+                            System.err.println("Tried " + tryCounter + " times");
+                        }
+                    }
+
                 }
             }
+
+
             turn++;
         }
 
     }
 
-    public static Spell spellPickerForRecipe(List<Spell> spells, Inventory inventory, PotionRecipe potionRecipe){
+
+    public static Inventory simulateSpellCast(Spell simuSpell, Inventory inventory) {
+        inventory.setInv0(inventory.getInv0() + simuSpell.getDelta0());
+        inventory.setInv1(inventory.getInv1() + simuSpell.getDelta1());
+        inventory.setInv2(inventory.getInv2() + simuSpell.getDelta2());
+        inventory.setInv3(inventory.getInv3() + simuSpell.getDelta3());
+        return inventory;
+    }
+
+
+    public static Spell spellPickerForRecipe(List<Spell> spells, Inventory inventory, PotionRecipe potionRecipe) {
         System.err.println("spellPickerForRecipe listassa " + spells.size() + " kpl");
         Spell bestSpellInItsType = new Spell();
         int highestPoints = 0;
@@ -292,15 +336,15 @@ class Player {
         //TODO: use iterator or CopyOnWriteArrayList
 
         Iterator<Spell> spellsIterator = spells.iterator();
-        while(spellsIterator.hasNext()){
+        while (spellsIterator.hasNext()) {
             Spell s = spellsIterator.next();
-            if(!checkIfRoom(s, inventory)){
+            if (!checkIfRoom(s, inventory)) {
                 System.err.println("no room " + s.getSpellId());
                 spellsIterator.remove();
-            }else if(!s.isCastable()){
+            } else if (!s.isCastable()) {
                 System.err.println("nonCastable " + s.getSpellId());
                 spellsIterator.remove();
-            }else if (!checkIfEnoughIncredientsToCast(s,inventory)){
+            } else if (!checkIfEnoughIncredientsToCast(s, inventory)) {
                 System.err.println("notEnough regents " + s.getSpellId());
                 spellsIterator.remove();
             }//TODO: check if another spell can enable this ???
@@ -316,24 +360,48 @@ class Player {
             }
         }
 */
-        if(spells.isEmpty()){
+        if (spells.isEmpty()) {
             System.err.println("eiYhtaanSoveliastaTaikaa ");
             return null;
         }
         //check if one closer to requirements
-        for(Spell s : spells){
+        for (Spell s : spells) {
             int tmp = 0;
             // checking if recipe has any other incredients which Spell makes
-            if((Math.abs(potionRecipe.getDelta0()) > 0 || Math.abs(s.getDelta0()) > 0) && inventory.getInv0() < 1 ) {tmp++;};
-            if((Math.abs(potionRecipe.getDelta1()) > 0 || Math.abs(s.getDelta1()) > 0) && inventory.getInv1() < 1 ) {tmp++;};
-            if((Math.abs(potionRecipe.getDelta2()) > 0 || Math.abs(s.getDelta2()) > 0) && inventory.getInv2() < 1 ) {tmp++;};
-            if((Math.abs(potionRecipe.getDelta3()) > 0 || Math.abs(s.getDelta3()) > 0) && inventory.getInv3() < 1 ) {tmp++;};
-            if((Math.abs(potionRecipe.getDelta0()) > 0 || Math.abs(s.getDelta0()) > 0) && inventory.getInv0() < 1 ) {tmp++;};
-            if((Math.abs(potionRecipe.getDelta1()) > 1 || Math.abs(s.getDelta1()) > 1) && inventory.getInv1() < 2 ) {tmp++;};
-            if((Math.abs(potionRecipe.getDelta2()) > 1 || Math.abs(s.getDelta2()) > 1) && inventory.getInv2() < 2 ) {tmp++;};
-            if((Math.abs(potionRecipe.getDelta3()) > 1 || Math.abs(s.getDelta3()) > 1) && inventory.getInv3() < 2 ) {tmp++;};
+            if ((Math.abs(potionRecipe.getDelta0()) > 0 || Math.abs(s.getDelta0()) > 0) && inventory.getInv0() < 1) {
+                tmp++;
+            }
+            ;
+            if ((Math.abs(potionRecipe.getDelta1()) > 0 || Math.abs(s.getDelta1()) > 0) && inventory.getInv1() < 1) {
+                tmp++;
+            }
+            ;
+            if ((Math.abs(potionRecipe.getDelta2()) > 0 || Math.abs(s.getDelta2()) > 0) && inventory.getInv2() < 1) {
+                tmp++;
+            }
+            ;
+            if ((Math.abs(potionRecipe.getDelta3()) > 0 || Math.abs(s.getDelta3()) > 0) && inventory.getInv3() < 1) {
+                tmp++;
+            }
+            ;
+            if ((Math.abs(potionRecipe.getDelta0()) > 0 || Math.abs(s.getDelta0()) > 0) && inventory.getInv0() < 1) {
+                tmp++;
+            }
+            ;
+            if ((Math.abs(potionRecipe.getDelta1()) > 1 || Math.abs(s.getDelta1()) > 1) && inventory.getInv1() < 2) {
+                tmp++;
+            }
+            ;
+            if ((Math.abs(potionRecipe.getDelta2()) > 1 || Math.abs(s.getDelta2()) > 1) && inventory.getInv2() < 2) {
+                tmp++;
+            }
+            ;
+            if ((Math.abs(potionRecipe.getDelta3()) > 1 || Math.abs(s.getDelta3()) > 1) && inventory.getInv3() < 2) {
+                tmp++;
+            }
+            ;
             System.err.println("checking regents spell gives " + tmp);
-            if(tmp >= highestPoints){
+            if (tmp >= highestPoints) {
                 highestPoints = tmp;
                 bestSpellInItsType = s;
             }
@@ -342,13 +410,13 @@ class Player {
         return bestSpellInItsType;
     }
 
-    public static boolean checkIfRoom(Spell spell, Inventory inventory){
+    public static boolean checkIfRoom(Spell spell, Inventory inventory) {
         //System.err.println("checkIfRoom");
         // plusminus inventory is how much it effects the inventory
         int inventoryChange = spell.getplusMinusInventory();
         int room = inventory.getEmptySpace();
-        if (inventoryChange > 0){
-            if(room <= inventoryChange){
+        if (inventoryChange > 0) {
+            if (room <= inventoryChange) {
                 //System.err.println("noRoom");
                 return false;
             }
@@ -357,7 +425,7 @@ class Player {
         return true;
     }
 
-    public static Inventory addToRecipeInventory(PotionRecipe pr, Inventory recipeInventory){
+    public static Inventory addToRecipeInventory(PotionRecipe pr, Inventory recipeInventory) {
         recipeInventory.setInv0(recipeInventory.getInv0() + Math.abs(pr.getDelta0()));
         recipeInventory.setInv1(recipeInventory.getInv1() + Math.abs(pr.getDelta1()));
         recipeInventory.setInv2(recipeInventory.getInv2() + Math.abs(pr.getDelta2()));
@@ -367,51 +435,51 @@ class Player {
 
     // Check if the spell can be casted
     // example inv 2 blue , spell cost 3 blue:  2 + -3 = -1 => false
-    public static boolean checkIfEnoughIncredientsToCast(Spell spell, Inventory inventory){
+    public static boolean checkIfEnoughIncredientsToCast(Spell spell, Inventory inventory) {
 
-        if(0 > inventory.getInv0() + spell.getDelta0()){
+        if (0 > inventory.getInv0() + spell.getDelta0()) {
             return false;
         }
-        if(0 > inventory.getInv1() + spell.getDelta1()){
+        if (0 > inventory.getInv1() + spell.getDelta1()) {
             return false;
         }
-        if(0 > inventory.getInv2() + spell.getDelta2()){
+        if (0 > inventory.getInv2() + spell.getDelta2()) {
             return false;
         }
-        if(0 > inventory.getInv3() + spell.getDelta3()){
+        if (0 > inventory.getInv3() + spell.getDelta3()) {
             return false;
         }
         return true;
     }
 
 
-    public static CostChart costCharUpdater(Spell newLearnedSpell, CostChart costChart){
+    public static CostChart costCharUpdater(Spell newLearnedSpell, CostChart costChart) {
         // Rething this again, I think need to check spell type first and also tell those
         int delta0 = Math.abs(newLearnedSpell.getDelta0()); // 0,5
         int delta1 = Math.abs(newLearnedSpell.getDelta1()); // 1
         int delta2 = Math.abs(newLearnedSpell.getDelta2()); // 2
         int delta3 = Math.abs(newLearnedSpell.getDelta3()); // 3
         // For some reason dont want infinities 1,1,2,3
-        if(delta0 > 0 ){
+        if (delta0 > 0) {
             costChart.setDelta0PriceInTurns(costChart.getDelta0PriceInTurns() / (2 * delta0));
         }
-        if(delta1 > 0){
+        if (delta1 > 0) {
             costChart.setDelta1PriceInTurns(costChart.getDelta1PriceInTurns() / (2 * delta1));
         }
-        if(delta2 > 0){
+        if (delta2 > 0) {
             costChart.setDelta2PriceInTurns(costChart.getDelta2PriceInTurns() / (2 * delta2));
         }
-        if(delta3 > 0){
+        if (delta3 > 0) {
             costChart.setDelta3PriceInTurns(costChart.getDelta3PriceInTurns() / (2 * delta3));
         }
         return costChart;
     }
 
-    public static double giveSpellValue(Spell spell, CostChart costChart, Inventory recipeInventory){
+    public static double giveSpellValue(Spell spell, CostChart costChart, Inventory recipeInventory) {
         //System.err.println("giveSpellValue:" + spell.getSpellId() + " spellid");
         double spellValue = 0;
         double thresholdAdjust = 1;
-        spellValue =+ thresholdAdjust;
+        spellValue = +thresholdAdjust;
 
         double weighInventory = 10;
 
@@ -430,11 +498,11 @@ class Player {
 
 
         // I don't like spending delta 3
-        if (delta3 < 0){
+        if (delta3 < 0) {
             return -9999.0;
         }
         // I don't like spells which use more than -2 blue or -1 green
-        if (delta0 < -2 || delta1 < -2 || delta2 < 0 || delta3 < 0){
+        if (delta0 < -2 || delta1 < -2 || delta2 < 0 || delta3 < 0) {
             return -9999.0;
         }
 
@@ -442,7 +510,6 @@ class Player {
         double delta1Value = costChart.getDelta1PriceInTurns();
         double delta2Value = costChart.getDelta2PriceInTurns();
         double delta3Value = costChart.getDelta3PriceInTurns();
-
 
 
         spellValue = spellValue + (delta0 * delta0Value * recipesD0weigh);
@@ -462,9 +529,9 @@ class Player {
 
     public static void cast(Spell spell) {
         System.err.println("Casting:" + spell.getspellType() + " spelltype");
-        if(spell.castable){
+        if (spell.castable) {
             System.out.println("CAST " + spell.spellId);
-        }else{
+        } else {
             rest();
         }
 
@@ -520,7 +587,7 @@ class Spell {
     int spellType; //TODO make better for now 1 2 3 !!!
     int plusMinusInventory;
 
-    public Spell(){
+    public Spell() {
 
     }
 
@@ -545,6 +612,7 @@ class Spell {
     public int getspellType() {
         return spellType;
     }
+
     //TODO make better
     public void setspellType(int spellType) {
         this.spellType = spellType;
@@ -588,7 +656,7 @@ class Spell {
     }
 }
 
-class CostChart{
+class CostChart {
     double delta0PriceInTurns;
     double delta1PriceInTurns;
     double delta2PriceInTurns;
@@ -639,7 +707,7 @@ class CostChart{
                 " " + String.format("%.2f", delta0PriceInTurns) +
                 " | " + String.format("%.2f", delta1PriceInTurns) +
                 " | " + String.format("%.2f", delta2PriceInTurns) +
-                " | " + String.format("%.2f", delta3PriceInTurns) ;
+                " | " + String.format("%.2f", delta3PriceInTurns);
     }
 }
 
@@ -653,7 +721,10 @@ class PotionRecipe {
     Double ingredientCost;
     Double profit;
 
-    public PotionRecipe(){};
+    public PotionRecipe() {
+    }
+
+    ;
 
     public PotionRecipe(int potionId, int delta0, int delta1, int delta2, int delta3, Integer price, CostChart costChart) {
         this.potionId = potionId;
@@ -743,7 +814,7 @@ class Inventory {
         this.inv2 = inv2;
         this.inv3 = inv3;
         this.score = score;
-        this.emptySpace = 10 - inv0 - inv1 -inv2 - inv3;
+        this.emptySpace = 10 - inv0 - inv1 - inv2 - inv3;
     }
 
     public int getEmptySpace() {
